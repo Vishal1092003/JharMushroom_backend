@@ -96,6 +96,25 @@ const addOrderItems = async (req, res) => {
         }
         broadcast({ type: 'orders_changed', action: 'created', id: createdOrder._id.toString() });
         broadcast({ type: 'products_changed', action: 'stock_updated' });
+        broadcast({
+            type: 'notification',
+            audience: 'admin',
+            title: 'New order placed',
+            body: `${createdOrder._id} · ${items.length} line item(s) · total ₹${resolvedTotalAmount}`,
+            category: 'order',
+            entityType: 'order',
+            entityId: createdOrder._id.toString()
+        });
+        broadcast({
+            type: 'notification',
+            audience: 'user',
+            userId: req.user._id.toString(),
+            title: 'Order placed',
+            body: `${createdOrder._id} was placed successfully.`,
+            category: 'order',
+            entityType: 'order',
+            entityId: createdOrder._id.toString()
+        });
         res.status(201).json({ status: 'success', data: createdOrder });
 
     } catch (error) {
@@ -201,6 +220,25 @@ const updateOrderStatus = async (req, res) => {
                 broadcast({ type: 'products_changed', action: 'stock_restored' });
             }
             broadcast({ type: 'orders_changed', action: 'status_updated', id: updatedOrder._id.toString(), status: updatedOrder.status });
+            broadcast({
+                type: 'notification',
+                audience: 'admin',
+                title: 'Order status updated',
+                body: `${updatedOrder._id} moved from ${previousStatus} to ${updatedOrder.status}.`,
+                category: 'order',
+                entityType: 'order',
+                entityId: updatedOrder._id.toString()
+            });
+            broadcast({
+                type: 'notification',
+                audience: 'user',
+                userId: updatedOrder.user.toString(),
+                title: 'Order update',
+                body: `${updatedOrder._id} is now ${updatedOrder.status}.`,
+                category: 'order',
+                entityType: 'order',
+                entityId: updatedOrder._id.toString()
+            });
             res.json({ status: 'success', data: updatedOrder });
         } else {
             res.status(404).json({ status: 'error', message: 'Order not found' });

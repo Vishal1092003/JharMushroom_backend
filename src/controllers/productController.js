@@ -37,6 +37,26 @@ const createProduct = async (req, res) => {
         const product = new Product(req.body);
         const createdProduct = await product.save();
         broadcast({ type: 'products_changed', action: 'created', id: createdProduct._id.toString() });
+        broadcast({
+            type: 'notification',
+            audience: 'admin',
+            title: 'Product created',
+            body: `${createdProduct.name} was added with stock ${createdProduct.stockQuantity}.`,
+            category: 'product',
+            entityType: 'product',
+            entityId: createdProduct._id.toString()
+        });
+        if (createdProduct.isAvailable) {
+            broadcast({
+                type: 'notification',
+                audience: 'all',
+                title: 'New product available',
+                body: `${createdProduct.name} is now available in the catalog.`,
+                category: 'product',
+                entityType: 'product',
+                entityId: createdProduct._id.toString()
+            });
+        }
         res.status(201).json({ status: 'success', data: createdProduct });
     } catch (error) {
         res.status(500).json({ status: 'error', message: error.message });
@@ -55,6 +75,15 @@ const updateProduct = async (req, res) => {
 
         if (product) {
             broadcast({ type: 'products_changed', action: 'updated', id: product._id.toString() });
+            broadcast({
+                type: 'notification',
+                audience: 'admin',
+                title: 'Product updated',
+                body: `${product.name} now has stock ${product.stockQuantity}.`,
+                category: 'product',
+                entityType: 'product',
+                entityId: product._id.toString()
+            });
             res.json({ status: 'success', data: product });
         } else {
             res.status(404).json({ status: 'error', message: 'Product not found' });
@@ -71,6 +100,15 @@ const deleteProduct = async (req, res) => {
         const product = await Product.findByIdAndDelete(req.params.id);
         if (product) {
             broadcast({ type: 'products_changed', action: 'deleted', id: product._id.toString() });
+            broadcast({
+                type: 'notification',
+                audience: 'admin',
+                title: 'Product deleted',
+                body: `${product.name} was removed from the catalog.`,
+                category: 'product',
+                entityType: 'product',
+                entityId: product._id.toString()
+            });
             res.json({ status: 'success', message: 'Product removed' });
         } else {
             res.status(404).json({ status: 'error', message: 'Product not found' });
