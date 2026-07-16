@@ -4,6 +4,7 @@ const {
     addOrderItems,
     verifyPayment,
     getMyOrders,
+    getOrderById,
     getOrders,
     updateOrderStatus
 } = require('../controllers/orderController');
@@ -20,6 +21,8 @@ router.route('/')
 router.get('/myorders', getMyOrders);
 
 router.post('/:id/verify', verifyPayment);
+
+router.get('/:id', getOrderById);
 
 router.put('/:id/status', admin, updateOrderStatus); // Admin only to update status
 
