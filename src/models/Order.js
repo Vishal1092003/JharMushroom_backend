@@ -8,7 +8,9 @@ const orderItemSchema = new mongoose.Schema({
     },
     name: { type: String, required: true },
     quantity: { type: Number, required: true },
-    pricePerUnit: { type: Number, required: true }
+    pricePerUnit: { type: Number, required: true },
+    reservedQuantity: { type: Number, default: 0 },
+    extraDemandQuantity: { type: Number, default: 0 }
 });
 
 const addressSchema = new mongoose.Schema({
@@ -45,6 +47,10 @@ const orderSchema = new mongoose.Schema({
         type: String,
         enum: ['PLACED', 'CONFIRMED', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'],
         default: 'PLACED'
+    },
+    hasExtraDemand: {
+        type: Boolean,
+        default: false
     }
 }, { timestamps: true });
 

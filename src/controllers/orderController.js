@@ -30,14 +30,19 @@ const addOrderItems = async (req, res) => {
             return res.status(400).json({ status: 'error', message: 'No order items' });
         }
 
+        const orderItems = [];
+        const demandItems = [];
+
         for (const item of items) {
             const product = await Product.findById(item.product);
             if (!product) {
                 return res.status(404).json({ status: 'error', message: `Product not found: ${item.name}` });
             }
-            if (product.stockQuantity < item.quantity) {
-                return res.status(400).json({ status: 'error', message: `${product.name} has only ${product.stockQuantity} in stock` });
-            }
+            orderItems.push({
+                ...item,
+                reservedQuantity: 0,
+                extraDemandQuantity: 0
+            });
         }
 
         const computedSubTotal = items.reduce((sum, item) => sum + item.quantity * item.pricePerUnit, 0);
@@ -48,7 +53,7 @@ const addOrderItems = async (req, res) => {
 
         const order = new Order({
             user: req.user._id,
-            items,
+            items: orderItems,
             deliveryAddress,
             paymentMethod,
             subTotal: resolvedSubTotal,
@@ -70,19 +75,38 @@ const addOrderItems = async (req, res) => {
             order.razorpayOrderId = razorpayOrder.id;
         }
 
-        for (const item of items) {
-            const reserved = await Product.findOneAndUpdate(
-                { _id: item.product, stockQuantity: { $gte: item.quantity } },
-                { $inc: { stockQuantity: -item.quantity } },
-                { new: true }
-            );
-            if (!reserved) {
-                await Promise.all(reservedItems.map((done) =>
-                    Product.findByIdAndUpdate(done.product, { $inc: { stockQuantity: done.quantity } })
-                ));
-                return res.status(409).json({ status: 'error', message: `${item.name} is no longer available in requested quantity` });
+        for (const item of order.items) {
+            const product = await Product.findById(item.product);
+            const available = Math.max(product?.stockQuantity || 0, 0);
+            const requested = Math.max(item.quantity || 0, 0);
+            const reserveQty = Math.min(available, requested);
+
+            if (reserveQty > 0) {
+                const reserved = await Product.findOneAndUpdate(
+                    { _id: item.product, stockQuantity: { $gte: reserveQty } },
+                    { $inc: { stockQuantity: -reserveQty } },
+                    { new: true }
+                );
+                if (reserved) {
+                    item.reservedQuantity = reserveQty;
+                    reservedItems.push({ product: item.product, quantity: reserveQty });
+                }
             }
-            reservedItems.push(item);
+
+            item.extraDemandQuantity = requested - item.reservedQuantity;
+            if (item.extraDemandQuantity > 0) {
+                order.hasExtraDemand = true;
+                demandItems.push({
+                    name: item.name,
+                    requested,
+                    reserved: item.reservedQuantity,
+                    extra: item.extraDemandQuantity
+                });
+            }
+        }
+
+        if (order.hasExtraDemand) {
+            order.status = 'PLACED';
         }
 
         let createdOrder;
@@ -105,6 +129,20 @@ const addOrderItems = async (req, res) => {
             entityType: 'order',
             entityId: createdOrder._id.toString()
         });
+        if (demandItems.length > 0) {
+            const demandSummary = demandItems
+                .map((item) => `${item.name}: ${item.extra} extra requested`)
+                .join(', ');
+            broadcast({
+                type: 'notification',
+                audience: 'admin',
+                title: 'Extra demand pending',
+                body: `${createdOrder._id} needs admin attention. ${demandSummary}.`,
+                category: 'order',
+                entityType: 'order',
+                entityId: createdOrder._id.toString()
+            });
+        }
         broadcast({
             type: 'notification',
             audience: 'user',
@@ -138,7 +176,7 @@ const verifyPayment = async (req, res) => {
         if (isValid) {
             order.paymentStatus = 'COMPLETED';
             order.razorpayPaymentId = razorpayPaymentId;
-            order.status = 'CONFIRMED';
+            order.status = order.hasExtraDemand ? 'PLACED' : 'CONFIRMED';
             
             const updatedOrder = await order.save();
             broadcast({ type: 'orders_changed', action: 'payment_verified', id: updatedOrder._id.toString() });
@@ -215,7 +253,9 @@ const updateOrderStatus = async (req, res) => {
             const updatedOrder = await order.save();
             if (previousStatus !== 'CANCELLED' && updatedOrder.status === 'CANCELLED') {
                 await Promise.all(updatedOrder.items.map((item) =>
-                    Product.findByIdAndUpdate(item.product, { $inc: { stockQuantity: item.quantity } })
+                    Product.findByIdAndUpdate(item.product, {
+                        $inc: { stockQuantity: item.reservedQuantity ?? item.quantity }
+                    })
                 ));
                 broadcast({ type: 'products_changed', action: 'stock_restored' });
             }
