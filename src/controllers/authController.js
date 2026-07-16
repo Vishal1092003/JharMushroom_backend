@@ -26,6 +26,7 @@ const register = async (req, res) => {
                     name: user.name,
                     email: user.email,
                     role: user.role,
+                    isAdmin: user.role === 'admin' || user.isAdmin === true,
                     token: generateToken(user._id)
                 }
             });
@@ -53,6 +54,7 @@ const login = async (req, res) => {
                     name: user.name,
                     email: user.email,
                     role: user.role,
+                    isAdmin: user.role === 'admin' || user.isAdmin === true,
                     token: generateToken(user._id)
                 }
             });
@@ -76,7 +78,8 @@ const getProfile = async (req, res) => {
                     _id: user._id,
                     name: user.name,
                     email: user.email,
-                    role: user.role
+                    role: user.role,
+                    isAdmin: user.role === 'admin' || user.isAdmin === true
                 }
             });
         } else {

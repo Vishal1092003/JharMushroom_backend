@@ -1,11 +1,13 @@
 const Product = require('../models/Product');
+const { broadcast } = require('../realtime');
 
 // @desc    Fetch all products
 // @route   GET /api/v1/products
 const getProducts = async (req, res) => {
     try {
         // Find only available products for customers, all for admins
-        const filter = req.user && req.user.role === 'admin' ? {} : { isAvailable: true };
+        const isAdmin = req.user && (req.user.role === 'admin' || req.user.isAdmin === true);
+        const filter = isAdmin ? {} : { isAvailable: true };
         const products = await Product.find(filter);
         res.json({ status: 'success', data: products });
     } catch (error) {
@@ -34,6 +36,7 @@ const createProduct = async (req, res) => {
     try {
         const product = new Product(req.body);
         const createdProduct = await product.save();
+        broadcast({ type: 'products_changed', action: 'created', id: createdProduct._id.toString() });
         res.status(201).json({ status: 'success', data: createdProduct });
     } catch (error) {
         res.status(500).json({ status: 'error', message: error.message });
@@ -51,6 +54,7 @@ const updateProduct = async (req, res) => {
         );
 
         if (product) {
+            broadcast({ type: 'products_changed', action: 'updated', id: product._id.toString() });
             res.json({ status: 'success', data: product });
         } else {
             res.status(404).json({ status: 'error', message: 'Product not found' });
@@ -66,6 +70,7 @@ const deleteProduct = async (req, res) => {
     try {
         const product = await Product.findByIdAndDelete(req.params.id);
         if (product) {
+            broadcast({ type: 'products_changed', action: 'deleted', id: product._id.toString() });
             res.json({ status: 'success', message: 'Product removed' });
         } else {
             res.status(404).json({ status: 'error', message: 'Product not found' });
