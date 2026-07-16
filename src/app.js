@@ -11,6 +11,7 @@ app.use(express.json());
 app.use('/api/v1/auth', require('./routes/authRoutes'));
 app.use('/api/v1/products', require('./routes/productRoutes'));
 app.use('/api/v1/orders', require('./routes/orderRoutes'));
+app.use('/api/v1/uploads', require('./routes/uploadRoutes'));
 
 // Basic health check route
 app.get('/api/v1/health', (req, res) => {

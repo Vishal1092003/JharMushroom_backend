@@ -1,6 +1,22 @@
 const Product = require('../models/Product');
 const { broadcast } = require('../realtime');
 
+const normalizeProductBody = (body) => {
+    const imageUrls = Array.isArray(body.imageUrls)
+        ? body.imageUrls.map((url) => String(url).trim()).filter(Boolean)
+        : [];
+    const fallbackImageUrl = typeof body.imageUrl === 'string' ? body.imageUrl.trim() : '';
+    const normalizedImageUrls = imageUrls.length > 0
+        ? imageUrls
+        : (fallbackImageUrl ? [fallbackImageUrl] : []);
+
+    return {
+        ...body,
+        imageUrl: fallbackImageUrl || normalizedImageUrls[0] || '',
+        imageUrls: normalizedImageUrls
+    };
+};
+
 // @desc    Fetch all products
 // @route   GET /api/v1/products
 const getProducts = async (req, res) => {
@@ -34,7 +50,7 @@ const getProductById = async (req, res) => {
 // @route   POST /api/v1/products
 const createProduct = async (req, res) => {
     try {
-        const product = new Product(req.body);
+        const product = new Product(normalizeProductBody(req.body));
         const createdProduct = await product.save();
         broadcast({ type: 'products_changed', action: 'created', id: createdProduct._id.toString() });
         broadcast({
@@ -69,7 +85,7 @@ const updateProduct = async (req, res) => {
     try {
         const product = await Product.findByIdAndUpdate(
             req.params.id,
-            req.body,
+            normalizeProductBody(req.body),
             { new: true, runValidators: true }
         );
 
