@@ -13,7 +13,8 @@ const normalizeProductBody = (body) => {
     return {
         ...body,
         imageUrl: fallbackImageUrl || normalizedImageUrls[0] || '',
-        imageUrls: normalizedImageUrls
+        imageUrls: normalizedImageUrls,
+        sellerAddress: typeof body.sellerAddress === 'string' ? body.sellerAddress.trim() : ''
     };
 };
 
