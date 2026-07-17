@@ -20,6 +20,30 @@ const addressSchema = new mongoose.Schema({
     pincode: { type: String, required: true }
 });
 
+const statusHistorySchema = new mongoose.Schema({
+    status: {
+        type: String,
+        enum: ['PLACED', 'CONFIRMED', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'],
+        required: true
+    },
+    confirmedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    confirmedByName: {
+        type: String,
+        default: 'System'
+    },
+    note: {
+        type: String,
+        default: ''
+    },
+    changedAt: {
+        type: Date,
+        default: Date.now
+    }
+}, { _id: false });
+
 const orderSchema = new mongoose.Schema({
     user: {
         type: mongoose.Schema.Types.ObjectId,
@@ -51,6 +75,10 @@ const orderSchema = new mongoose.Schema({
     hasExtraDemand: {
         type: Boolean,
         default: false
+    },
+    statusHistory: {
+        type: [statusHistorySchema],
+        default: []
     }
 }, { timestamps: true });
 

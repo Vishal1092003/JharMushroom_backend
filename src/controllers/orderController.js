@@ -11,6 +11,17 @@ const nextStatuses = {
     DELIVERED: [],
     CANCELLED: []
 };
+const validStatuses = Object.keys(nextStatuses);
+
+const addStatusHistory = (order, status, actor, note = '') => {
+    order.statusHistory.push({
+        status,
+        confirmedBy: actor?._id,
+        confirmedByName: actor?.name || 'System',
+        note,
+        changedAt: new Date()
+    });
+};
 
 // @desc    Create new order
 // @route   POST /api/v1/orders
@@ -108,6 +119,7 @@ const addOrderItems = async (req, res) => {
         if (order.hasExtraDemand) {
             order.status = 'PLACED';
         }
+        addStatusHistory(order, order.status, null, 'Order placed');
 
         let createdOrder;
         try {
@@ -174,9 +186,13 @@ const verifyPayment = async (req, res) => {
         const isValid = verifySignature(order.razorpayOrderId, razorpayPaymentId, razorpaySignature);
 
         if (isValid) {
+            const previousStatus = order.status;
             order.paymentStatus = 'COMPLETED';
             order.razorpayPaymentId = razorpayPaymentId;
             order.status = order.hasExtraDemand ? 'PLACED' : 'CONFIRMED';
+            if (order.status !== previousStatus) {
+                addStatusHistory(order, order.status, null, 'Payment verified');
+            }
             
             const updatedOrder = await order.save();
             broadcast({ type: 'orders_changed', action: 'payment_verified', id: updatedOrder._id.toString() });
@@ -242,14 +258,39 @@ const updateOrderStatus = async (req, res) => {
         const order = await Order.findById(req.params.id);
         if (order) {
             const previousStatus = order.status;
-            const nextStatus = req.body.status;
+            const nextStatus = typeof req.body.status === 'string'
+                ? req.body.status.trim().toUpperCase()
+                : '';
+            if (!validStatuses.includes(nextStatus)) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: 'Invalid order status'
+                });
+            }
+            if (nextStatus === previousStatus) {
+                return res.status(409).json({
+                    status: 'error',
+                    message: `Order is already ${nextStatus}`
+                });
+            }
             if (!nextStatuses[previousStatus]?.includes(nextStatus)) {
                 return res.status(409).json({
                     status: 'error',
                     message: `Cannot move order from ${previousStatus} to ${nextStatus}`
                 });
             }
+            if (
+                order.paymentMethod === 'ONLINE' &&
+                order.paymentStatus !== 'COMPLETED' &&
+                nextStatus !== 'CANCELLED'
+            ) {
+                return res.status(409).json({
+                    status: 'error',
+                    message: 'Online payment must be completed before advancing this order'
+                });
+            }
             order.status = nextStatus;
+            addStatusHistory(order, nextStatus, req.user, `Moved from ${previousStatus} to ${nextStatus}`);
             const updatedOrder = await order.save();
             if (previousStatus !== 'CANCELLED' && updatedOrder.status === 'CANCELLED') {
                 await Promise.all(updatedOrder.items.map((item) =>
