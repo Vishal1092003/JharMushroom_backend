@@ -1,5 +1,6 @@
 const Product = require('../models/Product');
 const { broadcast } = require('../realtime');
+const { notify } = require('../services/notificationService');
 
 const normalizeProductBody = (body) => {
     const imageUrls = Array.isArray(body.imageUrls)
@@ -54,7 +55,7 @@ const createProduct = async (req, res) => {
         const product = new Product(normalizeProductBody(req.body));
         const createdProduct = await product.save();
         broadcast({ type: 'products_changed', action: 'created', id: createdProduct._id.toString() });
-        broadcast({
+        notify({
             type: 'notification',
             audience: 'admin',
             title: 'Product created',
@@ -64,7 +65,7 @@ const createProduct = async (req, res) => {
             entityId: createdProduct._id.toString()
         });
         if (createdProduct.isAvailable) {
-            broadcast({
+            notify({
                 type: 'notification',
                 audience: 'all',
                 title: 'New product available',
@@ -92,7 +93,7 @@ const updateProduct = async (req, res) => {
 
         if (product) {
             broadcast({ type: 'products_changed', action: 'updated', id: product._id.toString() });
-            broadcast({
+            notify({
                 type: 'notification',
                 audience: 'admin',
                 title: 'Product updated',
@@ -117,7 +118,7 @@ const deleteProduct = async (req, res) => {
         const product = await Product.findByIdAndDelete(req.params.id);
         if (product) {
             broadcast({ type: 'products_changed', action: 'deleted', id: product._id.toString() });
-            broadcast({
+            notify({
                 type: 'notification',
                 audience: 'admin',
                 title: 'Product deleted',

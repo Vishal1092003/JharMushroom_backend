@@ -2,6 +2,7 @@ const Order = require('../models/Order');
 const Product = require('../models/Product');
 const { createOrder, verifySignature } = require('../services/razorpayService');
 const { broadcast } = require('../realtime');
+const { notify } = require('../services/notificationService');
 
 const nextStatuses = {
     PLACED: ['CONFIRMED', 'CANCELLED'],
@@ -132,7 +133,7 @@ const addOrderItems = async (req, res) => {
         }
         broadcast({ type: 'orders_changed', action: 'created', id: createdOrder._id.toString() });
         broadcast({ type: 'products_changed', action: 'stock_updated' });
-        broadcast({
+        notify({
             type: 'notification',
             audience: 'admin',
             title: 'New order placed',
@@ -145,7 +146,7 @@ const addOrderItems = async (req, res) => {
             const demandSummary = demandItems
                 .map((item) => `${item.name}: ${item.extra} extra requested`)
                 .join(', ');
-            broadcast({
+            notify({
                 type: 'notification',
                 audience: 'admin',
                 title: 'Extra demand pending',
@@ -155,7 +156,7 @@ const addOrderItems = async (req, res) => {
                 entityId: createdOrder._id.toString()
             });
         }
-        broadcast({
+        notify({
             type: 'notification',
             audience: 'user',
             userId: req.user._id.toString(),
@@ -301,7 +302,7 @@ const updateOrderStatus = async (req, res) => {
                 broadcast({ type: 'products_changed', action: 'stock_restored' });
             }
             broadcast({ type: 'orders_changed', action: 'status_updated', id: updatedOrder._id.toString(), status: updatedOrder.status });
-            broadcast({
+            notify({
                 type: 'notification',
                 audience: 'admin',
                 title: 'Order status updated',
@@ -310,7 +311,7 @@ const updateOrderStatus = async (req, res) => {
                 entityType: 'order',
                 entityId: updatedOrder._id.toString()
             });
-            broadcast({
+            notify({
                 type: 'notification',
                 audience: 'user',
                 userId: updatedOrder.user.toString(),

@@ -27,6 +27,27 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    fcmTokens: [{
+        token: {
+            type: String,
+            required: true,
+            trim: true
+        },
+        platform: {
+            type: String,
+            default: 'android',
+            trim: true
+        },
+        deviceId: {
+            type: String,
+            default: '',
+            trim: true
+        },
+        updatedAt: {
+            type: Date,
+            default: Date.now
+        }
+    }],
     resetPasswordToken: String,
     resetPasswordExpire: Date,
 }, { timestamps: true });
