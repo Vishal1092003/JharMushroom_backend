@@ -35,7 +35,9 @@ const addOrderItems = async (req, res) => {
             subTotal,
             deliveryFee,
             totalAmount,
-            razorpayPaymentId
+            razorpayOrderId,
+            razorpayPaymentId,
+            razorpaySignature
         } = req.body;
 
         if (!items || items.length === 0) {
@@ -74,7 +76,11 @@ const addOrderItems = async (req, res) => {
         });
 
         if (paymentMethod === 'ONLINE' && razorpayPaymentId) {
+            if (!verifySignature(razorpayOrderId, razorpayPaymentId, razorpaySignature)) {
+                return res.status(400).json({ status: 'error', message: 'Invalid payment signature' });
+            }
             order.paymentStatus = 'COMPLETED';
+            order.razorpayOrderId = razorpayOrderId;
             order.razorpayPaymentId = razorpayPaymentId;
             order.status = 'CONFIRMED';
         }

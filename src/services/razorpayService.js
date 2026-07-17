@@ -33,6 +33,7 @@ const createOrder = async (amountInPaise, receiptId) => {
 
 const verifySignature = (orderId, paymentId, signature) => {
     const secret = process.env.RAZORPAY_KEY_SECRET;
+    if (!secret || !orderId || !paymentId || !signature) return false;
     const body = orderId + "|" + paymentId;
     const expectedSignature = crypto
         .createHmac('sha256', secret)
