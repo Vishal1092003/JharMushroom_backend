@@ -1,5 +1,25 @@
 const { createOrder, verifySignature } = require('../services/razorpayService');
 
+const razorpayMode = () => {
+    const keyId = process.env.RAZORPAY_KEY_ID || '';
+    if (keyId.startsWith('rzp_live_')) return 'live';
+    if (keyId.startsWith('rzp_test_')) return 'test';
+    return 'missing';
+};
+
+// @desc    Public safe payment config diagnostic
+// @route   GET /api/v1/payments/config
+const getPaymentConfig = async (req, res) => {
+    res.json({
+        status: 'success',
+        data: {
+            provider: 'razorpay',
+            mode: razorpayMode(),
+            keyConfigured: Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET)
+        }
+    });
+};
+
 // @desc    Create a Razorpay order for checkout
 // @route   POST /api/v1/payments/razorpay-order
 const createRazorpayOrder = async (req, res) => {
@@ -44,6 +64,7 @@ const verifyRazorpayPayment = async (req, res) => {
 };
 
 module.exports = {
+    getPaymentConfig,
     createRazorpayOrder,
     verifyRazorpayPayment
 };
